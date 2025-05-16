@@ -1,0 +1,21 @@
+PowerShellをダウンロード
+PowerShell-7.x.x-win-x64.msi
+
+PowerShell を起動
+
+以下のコマンドを入力して、プロファイルファイルのパスを確認
+$PROFILE
+出力例:C:\Users\hsuser\Documents\PowerShell\Microsoft.PowerShell_profile.ps1
+
+プロファイルファイルを作成
+New-Item -ItemType File -Path $PROFILE -Force
+
+プロファイルファイルの編集
+notepad $PROFILE
+
+必要な内容を追加
+if (Test-Path -Path $env:USERPROFILE\.vscode-terminal.ps1) {
+    . $env:USERPROFILE\.vscode-terminal.ps1
+}
+
+ファイルを保存して閉じる
