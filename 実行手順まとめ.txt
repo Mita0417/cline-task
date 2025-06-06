@@ -1,3 +1,5 @@
+アプリケーションにアクセスするためのURL：http://localhost:8080/kintai-app/kintaiservlet
+
 勤怠アプリの作成手順まとめ:
 
 1.  **仮想環境の構築と初期設定**:
