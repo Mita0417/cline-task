@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- XML宣言。バージョンとエンコーディングを指定 -->
+
+ <!-- web-app要素の開始。名前空間、スキーマの場所、バージョンを指定 -->
+<web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee" 
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee 
+         http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
+         version="3.1">
+
+	<!-- サーブレットの定義。名前と実装クラスを指定 -->
+    <servlet>
+        <servlet-name>KintaiServlet</servlet-name>
+        <servlet-class>com.kenshu.servlet.KintaiServlet</servlet-class>
+    </servlet>
+
+	<!-- サーブレットマッピング。サーブレット名とURLパターンを指定 -->
+    <servlet-mapping>
+        <servlet-name>KintaiServlet</servlet-name>
+        <url-pattern>/kintaiServlet</url-pattern>
+    </servlet-mapping>
+    
+    <!-- ウェルカムファイルリスト。アプリケーションのルートにアクセスしたときに表示されるファイルを指定 -->
+    <welcome-file-list>
+        <welcome-file>KintaiForm.jsp</welcome-file>
+    </welcome-file-list>
+
+</web-app>

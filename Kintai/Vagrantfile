@@ -1,30 +1,8 @@
-# -*- mode: ruby -*-
-# vi: set ft=ruby :
-
 Vagrant.configure("2") do |config|
-  config.vm.box = "ubuntu/jammy64"
-  config.vm.network "private_network", ip: "192.168.33.10"
-  config.vm.hostname = "kintai-app"
-
-  config.vm.provider "virtualbox" do |vb|
-    vb.memory = "2048"
-    vb.cpus = "2"
-  end
-
-  config.vm.provision "shell", inline: <<-SHELL
-    sudo apt-get update
-    sudo apt-get install -y mysql-server openjdk-11-jdk
-    sudo systemctl enable mysql
-    sudo systemctl start mysql
-
-    # MySQLのrootパスワードを簡単にする (例: root)
-    echo "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY 'root';" | sudo mysql --password=root
-    echo "FLUSH PRIVILEGES;" | sudo mysql --password=root
-
-    # データベースとユーザーを作成
-    echo "CREATE DATABASE IF NOT EXISTS kenshu_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;" | sudo mysql -u root -proot
-    echo "CREATE USER IF NOT EXISTS 'kenshu_user'@'localhost' IDENTIFIED BY 'password';" | sudo mysql -u root -proot
-    echo "GRANT ALL PRIVILEGES ON kenshu_db.* TO 'kenshu_user'@'localhost';" | sudo mysql -u root -proot
-    echo "FLUSH PRIVILEGES;" | sudo mysql -u root -proot
-  SHELL
+  config.vm.box = "ubuntu/focal64"
+  config.vm.network "forwarded_port", guest: 8080, host: 8080 # Tomcatポート
+  config.vm.network "forwarded_port", guest: 3306, host: 3307 # MySQLポート
+  config.vm.synced_folder ".", "/home/vagrant/kintai"
+  config.vm.provision "shell", path: "setup.sh"
+  config.vbguest.auto_update = false
 end

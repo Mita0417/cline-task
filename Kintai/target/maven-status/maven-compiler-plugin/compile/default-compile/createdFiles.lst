@@ -1,5 +1,3 @@
-com\kenshu\kintai\entity\Kintai.class
-com\kenshu\kintai\util\DatabaseUtil.class
-com\kenshu\kintai\servlet\KintaiServlet.class
-com\kenshu\kintai\dao\KintaiDao.class
-com\kenshu\kintai\entity\Kintai$1.class
+com\example\kintai\Kintai.class
+com\example\kintai\KintaiServlet.class
+com\example\kintai\KintaiService.class

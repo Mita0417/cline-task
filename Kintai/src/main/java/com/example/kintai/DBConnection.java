@@ -1,0 +1,28 @@
+package com.example.kintai; //パッケージ宣言
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+//データベース接続の設定を行うためのJavaクラス
+public class DBConnection
+{
+	private static final String URL = "jdbc:mysql://localhost:3306/kenshu_db?useSSL=false&serverTimezone=UTC&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true"; //データベース接続URL
+    private static final String USER = "root"; //MySQLのユーザ名
+    private static final String PASSWORD = "password"; //MySQLのパスワード
+
+    //データベース接続を取得するメソッド
+    public static Connection getConnection() throws SQLException
+    {
+        try
+        {
+            Class.forName ( "com.mysql.cj.jdbc.Driver" ); //JDBCドライバをロード
+        }
+        catch ( ClassNotFoundException e )
+        {
+            throw new SQLException ( "JDBC Driver not found.", e ); //ドライバが見つからない場合のエラーハンドリング
+        }
+        //DriverManagerを使用して接続を取得
+        return DriverManager.getConnection ( URL, USER, PASSWORD );
+    }
+}
