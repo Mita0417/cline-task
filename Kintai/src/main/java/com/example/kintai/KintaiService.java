@@ -72,7 +72,7 @@ public class KintaiService
 		List<Kintai> kintaiList = new ArrayList<>(); //勤怠データのリストを初期化
 		
 		//SQLクエリを定義
-		String sql =  "SELECT kinmu_ymd, work_st, work_ed, work_rt FROM tbl_kintai "
+		String sql =  "SELECT kinmu_ymd, work_st, work_ed, work_rt, overtime_minutes FROM tbl_kintai "
 		           + "WHERE DATE_FORMAT(kinmu_ymd, '%Y') = ? AND DATE_FORMAT(kinmu_ymd, '%m') = ?";
 		
 		try ( Connection connection = DBConnection.getConnection();
@@ -93,6 +93,7 @@ public class KintaiService
 				kintai.setWorkSt ( resultSet.getString ( "work_st" ) );    //出勤時刻を設定
 				kintai.setWorkEd ( resultSet.getString ( "work_ed" ) );     //退勤時刻を設定
 				kintai.setWorkRt ( resultSet.getString ( "work_rt" ) );    //休憩時間を設定
+				kintai.setOvertimeMinutes ( resultSet.getInt ( "overtime_minutes" ) ); //残業時間を設定
 				
 				//曜日を計算して設定
 				kintai.setWeekDay ( kintai.calculateWeekDay ( kintai.getKinmuYmd() ) );
@@ -153,12 +154,13 @@ public class KintaiService
 	//生成した空の勤怠データをデータベースに挿入するメソッド
 	private static void insertEmptyKintaiData ( Kintai kintai )
 	{
-		String insertSql = "INSERT INTO tbl_kintai (kinmu_ymd, work_st, work_ed, work_rt) VALUES (?, '', '', '')"; //SQL挿入クエリを定義
+		String insertSql = "INSERT INTO tbl_kintai (kinmu_ymd, work_st, work_ed, work_rt, overtime_minutes) VALUES (?, '', '', '', ?)"; //SQL挿入クエリを定義
 		
 		try ( Connection connection = DBConnection.getConnection(); //データベース接続を取得
 				PreparedStatement statement = connection.prepareStatement ( insertSql ) ) //プリペアドステートメントを作成
 		{
 			statement.setString(1, kintai.getKinmuYmd() ); //勤務日をパラメータとして設定
+			statement.setInt(2, kintai.getOvertimeMinutes()); //残業時間をパラメータとして設定
 			int rowsAffected = statement.executeUpdate(); //SQLクエリを実行してデータを挿入
 			if (rowsAffected > 0) {
 				logger.log(Level.INFO, "KintaiService: insertEmptyKintaiData - 空の勤怠データ挿入成功: " + kintai.getKinmuYmd());
@@ -170,6 +172,20 @@ public class KintaiService
 		{
 			logger.log ( Level.SEVERE, "空の勤怠データを挿入中にエラーが発生しました: " + kintai.getKinmuYmd(), e ); //エラーログを記録
 		}
+	}
+	
+	//1ヶ月の残業時間の合計を計算するメソッド
+	public static long calculateTotalMonthlyOvertime ( List<Kintai> kintaiList )
+	{
+		long totalOvertimeMinutes = 0; //総残業時間を分単位で保持
+		
+		//各日の残業時間をループ処理で合計する
+		for ( Kintai kintai : kintaiList )
+		{
+			totalOvertimeMinutes += kintai.getOvertimeMinutes();
+		}
+		//合計を返す
+		return totalOvertimeMinutes;
 	}
 	
 	//月の日数を取得するメソッド

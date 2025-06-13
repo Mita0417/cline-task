@@ -1,3 +1,4 @@
 com\example\kintai\Kintai.class
 com\example\kintai\KintaiServlet.class
+com\example\kintai\DBConnection.class
 com\example\kintai\KintaiService.class

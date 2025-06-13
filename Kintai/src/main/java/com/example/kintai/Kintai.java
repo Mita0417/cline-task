@@ -14,6 +14,7 @@ public class Kintai
 	private String workEd;   //退勤時刻（hhmm形式）
 	private String workRt;   //休憩時間（分）
 	private String workTime; //勤務時間（hh:mm形式）
+	private int overtimeMinutes; //残業時間（分）
 	private String weekDay;  //曜日
 	private String displayDate; //表示用の日付（yyyyMMdd形式で保存)
 	
@@ -21,6 +22,7 @@ public class Kintai
 	private static final String DEFAULT_WORK_ST = "";
 	private static final String DEFAULT_WORK_ED = "";
 	private static final String DEFAULT_WORK_RT = "";
+	private static final int DEFAULT_OVERTIME_MINUTES = 0;
 	
 	//デフォルトコンストラクタ：初期化時にフィールドにデフォルト値を設定
 	public Kintai()
@@ -28,6 +30,7 @@ public class Kintai
 		this.workSt = DEFAULT_WORK_ST; //出勤時刻にデフォルト値を設定
 		this.workEd = DEFAULT_WORK_ED; //退勤時刻にデフォルト値を設定
 		this.workRt = DEFAULT_WORK_RT; //休憩時間にデフォルト値を設定
+		this.overtimeMinutes = DEFAULT_OVERTIME_MINUTES; //残業時間にデフォルト値を設定
 	}
 	
 	//勤務日、出勤時刻、退勤時刻、休憩時間を指定して初期化するコンストラクタ
@@ -46,7 +49,7 @@ public class Kintai
 	public void calculateWorkTime()
 	{
 		//出勤時刻と退勤時刻が存在する場合のみ計算を行う
-		if ( workSt != null && workEd != null )
+		if ( workSt != null && workEd != null && !workSt.isEmpty() && !workEd.isEmpty() )
 		{
 			try
 			{
@@ -63,21 +66,51 @@ public class Kintai
 					int restMinutes = Integer.parseInt ( workRt ); //休憩時間を分に変換
 					workDuration = workDuration.minusMinutes ( restMinutes ); //休憩時間を引く
 				}
+				
 				//勤務時間を "HH:mm" フォーマットで保存
-				long hours = workDuration.toHours(); //時間を取得
-				long minutes = workDuration.toMinutes() % 60; //分を取得
+				long totalWorkMinutes = workDuration.toMinutes();
+				long hours = totalWorkMinutes / 60;
+				long minutes = totalWorkMinutes % 60;
 				this.workTime = String.format ( "%02d:%02d", hours, minutes ); //フォーマットして設定
+
+				// 残業時間の計算 (9:00-18:00を定時とする)
+				LocalTime regularStart = LocalTime.of(9, 0);
+				LocalTime regularEnd = LocalTime.of(18, 0);
+
+				long regularWorkMinutes = 0;
+
+				// 定時内の勤務時間を計算
+				LocalTime actualStart = start.isBefore(regularStart) ? regularStart : start;
+				LocalTime actualEnd = end.isAfter(regularEnd) ? regularEnd : end;
+
+				if (actualStart.isBefore(actualEnd)) {
+					regularWorkMinutes = Duration.between(actualStart, actualEnd).toMinutes();
+				}
+
+				// 休憩時間を定時勤務時間から引く
+				if (workRt != null && !workRt.isEmpty()) {
+					int restMinutes = Integer.parseInt(workRt);
+					// 休憩時間が定時内にあると仮定して、定時勤務時間から引く
+					regularWorkMinutes = Math.max(0, regularWorkMinutes - restMinutes);
+				}
+
+				// 総勤務時間から定時勤務時間を引いたものが残業時間
+				long overtime = totalWorkMinutes - regularWorkMinutes;
+				this.overtimeMinutes = (int) Math.max(0, overtime); // 残業時間は0未満にならないようにする
+				
 			}
 			catch ( DateTimeParseException e ) //例外処理
 			{
 				e.printStackTrace(); //例外発生時にスタックトレースを出力
 				this.workTime = "00:00"; //例外発生時のデフォルト
+				this.overtimeMinutes = 0; //例外発生時のデフォルト
 			}
 		}
 		else
 		{
 			//出勤時刻または退勤時刻が無効な場合は、勤務時間を"00:00"に設定
 			this.workTime = "00:00";
+			this.overtimeMinutes = 0;
 		}
 	}
 	
@@ -199,5 +232,20 @@ public class Kintai
 	public void setDisplayDate ( String displayDate )
 	{
 		this.displayDate = displayDate; //表示用の日付を設定
+	}
+	
+	public int getOvertimeMinutes() {
+		return overtimeMinutes;
+	}
+	
+	public void setOvertimeMinutes(int overtimeMinutes) {
+		this.overtimeMinutes = overtimeMinutes;
+	}
+	
+	// 残業時間を "HH:mm" 形式で取得するヘルパーメソッド
+	public String getOvertimeFormatted() {
+		long hours = overtimeMinutes / 60;
+		long minutes = overtimeMinutes % 60;
+		return String.format("%02d:%02d", hours, minutes);
 	}
 }

@@ -65,12 +65,22 @@
 	%>
 	
 	<%
-		//勤怠データが存在する場合のみ登録フォームを表示
 		List<Kintai> kintaiList = ( List<Kintai> ) request.getAttribute ( "kintaiList" ); //勤怠データのリストを取得
-		if ( kintaiList != null && !kintaiList.isEmpty() )
-		{ //勤怠データが存在する場合
+		boolean showTable = ( kintaiList != null && !kintaiList.isEmpty() ); //テーブルを表示するかどうかのフラグ
+		
+		// 合計勤務時間と合計残業時間の初期値を設定
+		double totalMonthlyWorkTime = 0.0;
+		long totalOvertimeMinutes = 0;
+
+		// KintaiServletから渡された合計残業時間を取得
+		Object totalOvertimeObj = request.getAttribute("totalOvertimeMinutes");
+		if (totalOvertimeObj instanceof Long) {
+			totalOvertimeMinutes = (Long) totalOvertimeObj;
+		} else if (totalOvertimeObj instanceof Integer) { // Integerで渡される可能性も考慮
+			totalOvertimeMinutes = ((Integer) totalOvertimeObj).longValue();
+		}
 	%>
-	
+	<% if (showTable) { %>
 	<!-- 勤怠データの登録フォーム -->
 	<form action = "/kintai-app/kintaiservlet" method = "post"> <!-- POSTメソッドでKintaiServletに送信 -->
 	
@@ -95,6 +105,7 @@
 				<th>退勤時刻</th>
 				<th>休憩時間(分)</th>
 				<th>勤務時間</th>
+				<th>残業時間</th>
 			</tr>
 			
 			<%
@@ -102,37 +113,30 @@
 				String yearStr = request.getParameter ( "year" );
 				String monthStr = request.getParameter ( "month" );
 				
-				//年と月が存在する場合
-				if ( yearStr != null && monthStr != null )
+				//年と月が存在し、かつテーブルを表示する場合
+				if ( yearStr != null && monthStr != null && showTable )
 				{
-					int year = Integer.parseInt ( yearStr ); //年を整数に変換
-					int month = Integer.parseInt ( monthStr ); //月を整数に変換
-					
-					//勤怠データが存在する場合
-					if ( kintaiList != null )
+					//各日の勤怠データを表示
+					for ( Kintai kintai : kintaiList )
 					{
-						double totalMonthlyWorkTime = 0.0; //月の合計勤務時間を初期化
+						String date = kintai.getDisplayDate();     //表示用の日付を取得
+						String weekDayName = kintai.getWeekDay();  //曜日を取得
+						String startTimeStr = kintai.getWorkSt();  //出勤時刻を取得
+						String endTimeStr = kintai.getWorkEd();    //退勤時刻を取得
+						String breakTimeStr = kintai.getWorkRt();  //休憩時間を取得
+						String workTimeStr = kintai.getWorkTime(); //勤務時間を取得
+						String overtimeFormatted = kintai.getOvertimeFormatted(); //残業時間を取得
 						
-						//各日の勤怠データを表示
-						for ( Kintai kintai : kintaiList )
+						double dailyWorkTime = 0.0; //日の勤務時間を初期化
+						
+						//勤務時間が存在する場合
+						if ( workTimeStr != null && !workTimeStr.isEmpty() )
 						{
-							String date = kintai.getDisplayDate();     //表示用の日付を取得
-							String weekDayName = kintai.getWeekDay();  //曜日を取得
-							String startTimeStr = kintai.getWorkSt();  //出勤時刻を取得
-							String endTimeStr = kintai.getWorkEd();    //退勤時刻を取得
-							String breakTimeStr = kintai.getWorkRt();  //休憩時間を取得
-							String workTimeStr = kintai.getWorkTime(); //勤務時間を取得
-							
-							double dailyWorkTime = 0.0; //日の勤務時間を初期化
-							
-							//勤務時間が存在する場合
-							if ( workTimeStr != null && !workTimeStr.isEmpty() )
-							{
-								String[] timeParts = workTimeStr.split ( ":" ); //勤務時間を分割
-								dailyWorkTime = Integer.parseInt ( timeParts[0] ) + Integer.parseInt ( timeParts[1] ) / 60.0; //日の勤務時間を計算
-							}
-							
-							totalMonthlyWorkTime += dailyWorkTime; //月の合計勤務時間に加算
+							String[] timeParts = workTimeStr.split ( ":" ); //勤務時間を分割
+							dailyWorkTime = Integer.parseInt ( timeParts[0] ) + Integer.parseInt ( timeParts[1] ) / 60.0; //日の勤務時間を計算
+						}
+						
+						totalMonthlyWorkTime += dailyWorkTime; //月の合計勤務時間に加算
 			%>
 			<tr>
 				<!-- 日付 -->
@@ -147,24 +151,31 @@
 				<td><input type = "text" name = "work_rt_<%= kintai.getKinmuYmd() %>" value = "<%= breakTimeStr %>"/></td>
 				<!-- 勤務時間 -->
 				<td><%= String.format ( "%.2f", dailyWorkTime ) %>時間</td> <!-- 1日の勤務時間を計算し、小数点以下2桁で表示 -->
+				<!-- 残業時間 -->
+				<td><%= String.format ( "%.2f", kintai.getOvertimeMinutes() / 60.0 ) %>時間</td>
 			</tr>
 			<%
-						}
+					} // forループの閉じタグ
+				} // if (yearStr != null && monthStr != null && showTable) の閉じタグ
+			%>
+			<%
+				// 合計勤務時間と合計残業時間の表示
+				// showTableがtrue (kintaiListが空でない) かつ、どちらかの合計が0より大きい場合のみ表示
+				if (showTable && (totalMonthlyWorkTime > 0 || totalOvertimeMinutes > 0)) {
 			%>
 			<tr>
-				<td colspan = "5" align = "right">合計勤務時間:</td>
+				<td colspan = "5" align = "right">合計時間:</td>
 				<!-- 月の合計勤務時間 -->
 				<td><%= String.format ( "%.2f", totalMonthlyWorkTime ) %>時間</td>
+				<!-- 月の合計残業時間 -->
+				<td><%= String.format ( "%.2f", totalOvertimeMinutes / 60.0 ) %>時間</td>
 			</tr>
 			<%
-					}
 				}
 			%>
 		</table>
 	</form>
-	<%
-		}
-	%>
+	<% } %>
 	
 	<script>
 		function confirmDelete() //削除確認ダイアログを表示する関数

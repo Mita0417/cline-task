@@ -6,6 +6,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.logging.Level; // 追加
+import java.util.logging.Logger; // 追加
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -19,8 +21,11 @@ import com.example.kintai.Kintai;
 import com.example.kintai.KintaiService;
 
 //サーブレットのURLパターンを設定
+@WebServlet("/kintai") // @WebServletアノテーションを追加
 public class KintaiServlet extends HttpServlet
 {
+	private static final Logger logger = Logger.getLogger(KintaiServlet.class.getName());
+
 	//GETリクエストを処理するメソッド
 	@Override
 	protected void doGet ( HttpServletRequest request, HttpServletResponse response )
@@ -65,6 +70,11 @@ public class KintaiServlet extends HttpServlet
 				//勤怠データをリクエストスコープに設定
 				request.setAttribute ( "kintaiList", kintaiList );
 				
+				//合計残業時間を計算し、リクエストスコープに設定
+				long totalOvertimeMinutes = KintaiService.calculateTotalMonthlyOvertime(kintaiList);
+				request.setAttribute("totalOvertimeMinutes", totalOvertimeMinutes);
+				logger.log(Level.INFO, "KintaiServlet: doPost - totalOvertimeMinutes: " + totalOvertimeMinutes);
+				
 				//検索結果に応じたメッセージを設定
 				message = !kintaiList.isEmpty() ? "検索完了" : "該当する勤怠データは見つかりませんでした。";
 			}
@@ -79,6 +89,11 @@ public class KintaiServlet extends HttpServlet
 			String month = request.getParameter ( "month" ); //月を取得
 			List<Kintai> kintaiList = KintaiService.getKintaiList ( year, month ); //勤怠データのリストを取得
 			request.setAttribute ( "kintaiList", kintaiList ); //勤怠データをリクエストスコープに設定
+			
+			//合計残業時間を計算し、リクエストスコープに設定 (登録後も表示を更新するため)
+			long totalOvertimeMinutes = KintaiService.calculateTotalMonthlyOvertime(kintaiList);
+			request.setAttribute("totalOvertimeMinutes", totalOvertimeMinutes);
+			logger.log(Level.INFO, "KintaiServlet: doPost (register) - totalOvertimeMinutes: " + totalOvertimeMinutes);
 		}
 		//アクションが 削除 の場合
 		else if ( "delete" .equals ( action ) )
@@ -142,6 +157,11 @@ public class KintaiServlet extends HttpServlet
 			// 勤務日が既に登録されているか確認
 			boolean isRegistered = checkKintaiExists ( kinmu_ymd );
 			
+			// Kintaiオブジェクトを作成し、残業時間を計算
+			Kintai kintai = new Kintai(kinmu_ymd, work_st, work_ed, work_rt);
+			kintai.calculateWorkTime(); // 残業時間を計算
+			logger.log(Level.INFO, "KintaiServlet: registerKintai - Calculated overtime for " + kinmu_ymd + ": " + kintai.getOvertimeMinutes() + " minutes");
+			
 			// データベースに接続し、勤怠データを登録または更新
 			try ( Connection connection = DBConnection.getConnection() )
 			{
@@ -150,21 +170,31 @@ public class KintaiServlet extends HttpServlet
 				// 既存の勤怠データがあれば更新、なければ挿入
 				if ( isRegistered )
 				{
-					sql = "UPDATE tbl_kintai SET work_st = ?, work_ed = ?, work_rt = ? WHERE kinmu_ymd = ?"; //更新SQL文
+					sql = "UPDATE tbl_kintai SET work_st = ?, work_ed = ?, work_rt = ?, overtime_minutes = ? WHERE kinmu_ymd = ?"; //更新SQL文
 				}
 				else
 				{
-					sql = "INSERT INTO tbl_kintai (kinmu_ymd, work_st, work_ed, work_rt) VALUES (?, ?, ?, ?)"; //挿入SQL文
+					sql = "INSERT INTO tbl_kintai (kinmu_ymd, work_st, work_ed, work_rt, overtime_minutes) VALUES (?, ?, ?, ?, ?)"; //挿入SQL文
 				}
 				
 				// 各パラメータをセット
 				try ( PreparedStatement statement = connection.prepareStatement ( sql ) )
 				{
-					statement.setString ( 1, work_st ); //出勤時刻をセット
-					statement.setString ( 2, work_ed ); //退勤時刻をセット
-					statement.setString ( 3, work_rt ); //休憩時間をセット
-					statement.setString ( 4, kinmu_ymd ); //勤務日をセット
+					if ( isRegistered ) {
+						statement.setString ( 1, work_st ); //出勤時刻をセット
+						statement.setString ( 2, work_ed ); //退勤時刻をセット
+						statement.setString ( 3, work_rt ); //休憩時間をセット
+						statement.setInt ( 4, kintai.getOvertimeMinutes() ); //残業時間をセット
+						statement.setString ( 5, kinmu_ymd ); //勤務日をセット (WHERE句)
+					} else {
+						statement.setString ( 1, kinmu_ymd ); //勤務日をセット
+						statement.setString ( 2, work_st ); //出勤時刻をセット
+						statement.setString ( 3, work_ed ); //退勤時刻をセット
+						statement.setString ( 4, work_rt ); //休憩時間をセット
+						statement.setInt ( 5, kintai.getOvertimeMinutes() ); //残業時間をセット
+					}
 					
+					logger.log(Level.INFO, "KintaiServlet: registerKintai - Executing SQL: " + sql + " with overtime: " + kintai.getOvertimeMinutes());
 					// SQL文を実行
 					int rowsAffected = statement.executeUpdate(); //SQL文を実行して影響を受けた行数を取得 
 					
@@ -179,7 +209,7 @@ public class KintaiServlet extends HttpServlet
 			catch ( SQLException e )
 			{
 				// エラーが発生した場合
-				e.printStackTrace(); //スタックトレースを出力
+				logger.log(Level.SEVERE, "KintaiServlet: registerKintai - SQL Error: " + e.getMessage(), e);
 				message = "登録失敗"; //登録失敗メッセージを設定
 				hasError = true; //エラーフラグを設定
 			}

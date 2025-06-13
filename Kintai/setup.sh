@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS tbl_kintai (
     PRIMARY KEY (kinmu_ymd),
     UNIQUE KEY (kinmu_ymd)
 );
+ALTER TABLE tbl_kintai ADD COLUMN overtime_minutes INT DEFAULT 0;
 EOF
 
 # OpenJDKをインストール
