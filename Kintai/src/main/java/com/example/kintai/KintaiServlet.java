@@ -142,6 +142,9 @@ public class KintaiServlet extends HttpServlet
 			boolean isWorkEdEmpty = work_ed.isEmpty();
 			boolean isWorkRtEmpty = work_rt.isEmpty();
 
+			// 時刻の正規表現パターン (HHmm形式で0000-2359を許可)
+			String timePattern = "([01][0-9]|2[0-3])[0-5][0-9]";
+
 			// 1. 出勤時刻と退勤時刻のどちらか一方のみが入力されている場合
 			if ( (isWorkStEmpty && !isWorkEdEmpty) || (!isWorkStEmpty && isWorkEdEmpty) ) {
 				hasError = true;
@@ -154,6 +157,37 @@ public class KintaiServlet extends HttpServlet
 				continue; // この日の処理をスキップ
 			}
 			
+			// 3. 出勤時刻または退勤時刻が入力されている場合、時刻フォーマットを検証
+			if (!isWorkStEmpty && !work_st.matches(timePattern)) {
+				logger.log(Level.WARNING, "KintaiServlet: registerKintai - Invalid work_st format for " + kinmu_ymd + ": " + work_st);
+				hasError = true;
+				continue;
+			}
+			if (!isWorkEdEmpty && !work_ed.matches(timePattern)) {
+				logger.log(Level.WARNING, "KintaiServlet: registerKintai - Invalid work_ed format for " + kinmu_ymd + ": " + work_ed);
+				hasError = true;
+				continue;
+			}
+			
+			// 4. 出勤時刻と退勤時刻が両方入力されている場合、退勤時刻が出勤時刻より早いか同じでないか検証
+			if (!isWorkStEmpty && !isWorkEdEmpty) {
+				try {
+					java.time.LocalTime startTime = java.time.LocalTime.parse(work_st, java.time.format.DateTimeFormatter.ofPattern("HHmm"));
+					java.time.LocalTime endTime = java.time.LocalTime.parse(work_ed, java.time.format.DateTimeFormatter.ofPattern("HHmm"));
+					
+					if (startTime.isAfter(endTime) || startTime.equals(endTime)) {
+						logger.log(Level.WARNING, "KintaiServlet: registerKintai - End time is not after start time for " + kinmu_ymd + ": Start=" + work_st + ", End=" + work_ed);
+						message = "退勤時刻は出勤時刻より後に設定してください。"; // エラーメッセージを上書き
+						hasError = true;
+						continue;
+					}
+				} catch (java.time.format.DateTimeParseException e) {
+					logger.log(Level.SEVERE, "KintaiServlet: registerKintai - DateTimeParseException for " + kinmu_ymd, e);
+					hasError = true;
+					continue;
+				}
+			}
+
 			// 勤務日が既に登録されているか確認
 			boolean isRegistered = checkKintaiExists ( kinmu_ymd );
 			

@@ -32,7 +32,7 @@
 		<input type = "hidden" name = "action" value = "search">
 		
 		<!-- 年の入力欄 -->
-		<input type = "text" name = "year" maxlength = "4" required style="width: 60px;"> 年 <!-- 未入力の状態では送信不可 -->
+		<input type = "text" name = "year" id="yearInput" maxlength = "4" pattern="[0-9]{4}" required style="width: 60px;"> 年 <!-- 未入力の状態では送信不可 -->
 		
 		<!-- 月の選択リスト -->
 		<select name = "month" required> <!-- 未入力の状態では送信不可 -->
@@ -144,11 +144,11 @@
 				<!-- 曜日 -->
 				<td><%= weekDayName %></td>
 				<!-- 出勤時刻 -->
-				<td><input type = "text" name = "work_st_<%= kintai.getKinmuYmd() %>" value = "<%= startTimeStr %>"/></td>
+				<td><input type = "text" name = "work_st_<%= kintai.getKinmuYmd() %>" value = "<%= startTimeStr %>" maxlength="4" pattern="([01][0-9]|2[0-3])[0-5][0-9]" oninput="validateTimeInput(this)"/></td>
 				<!-- 退勤時刻 -->
-				<td><input type = "text" name = "work_ed_<%= kintai.getKinmuYmd() %>" value = "<%= endTimeStr %>"/></td>
+				<td><input type = "text" name = "work_ed_<%= kintai.getKinmuYmd() %>" value = "<%= endTimeStr %>" maxlength="4" pattern="([01][0-9]|2[0-3])[0-5][0-9]" oninput="validateTimeInput(this)"/></td>
 				<!-- 休憩時間 (分) -->
-				<td><input type = "text" name = "work_rt_<%= kintai.getKinmuYmd() %>" value = "<%= breakTimeStr %>"/></td>
+				<td><input type = "text" name = "work_rt_<%= kintai.getKinmuYmd() %>" value = "<%= breakTimeStr %>" maxlength="3" pattern="[0-9]{1,3}"/></td>
 				<!-- 勤務時間 -->
 				<td><%= String.format ( "%.2f", dailyWorkTime ) %>時間</td> <!-- 1日の勤務時間を計算し、小数点以下2桁で表示 -->
 				<!-- 残業時間 -->
@@ -178,6 +178,37 @@
 	<% } %>
 	
 	<script>
+		// 年入力フィールドの文字数制限
+		document.addEventListener('DOMContentLoaded', function() {
+			const yearInput = document.getElementById('yearInput');
+			yearInput.addEventListener('input', function() {
+				if (this.value.length > 4) {
+					this.value = this.value.slice(0, 4);
+				}
+			});
+		});
+
+		// 時刻入力フィールドのバリデーション
+		function validateTimeInput(inputElement) {
+			let value = inputElement.value;
+			// 数字以外を削除
+			value = value.replace(/[^0-9]/g, '');
+
+			if (value.length > 0) {
+				const firstChar = parseInt(value.charAt(0));
+				if (firstChar < 0 || firstChar > 2) { // 1桁目は0, 1, 2のみ
+					value = ''; // 無効な場合はクリア
+				}
+			}
+			if (value.length > 2) {
+				const thirdChar = parseInt(value.charAt(2));
+				if (thirdChar < 0 || thirdChar > 5) { // 3桁目は0～5のみ
+					value = value.slice(0, 2) + value.charAt(3); // 3桁目を削除
+				}
+			}
+			inputElement.value = value;
+		}
+
 		function confirmDelete() //削除確認ダイアログを表示する関数
 		{
 			//確認ダイアログを表示
